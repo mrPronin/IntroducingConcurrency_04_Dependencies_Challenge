@@ -1,9 +1,13 @@
 import Compressor
 import UIKit
+import XCPlayground
+
 //: # Compressor Operation
 //: Continuing from the challenge in the previous video, your challenge for this video is to use an `NSOperationQueue` to decompress a collection of compressed images.
 
 //: Input and output variables
+XCPlaygroundPage.currentPage.needsIndefiniteExecution = true
+
 let compressedFilePaths = ["01", "02", "03", "04", "05"].map {
   NSBundle.mainBundle().URLForResource("sample_\($0)_small", withExtension: "compressed")
 }
@@ -64,7 +68,12 @@ class TiltShiftOperation : NSOperation {
   var outputImage: UIImage?
   
   override func main() {
-    // TODO: Update the input image location to check for input from dependencies
+    if let dependencyData = dependencies
+        .filter({ $0 is ImageFilterDataProvider })
+        .first as? ImageFilterDataProvider
+        where inputImage == .None {
+            inputImage = dependencyData.decompressedImage
+    }
     
     guard let inputImage = inputImage else { return }
     let mask = topAndBottomGradient(inputImage.size)
@@ -75,10 +84,12 @@ class TiltShiftOperation : NSOperation {
 
 //: Image filter input data transfer
 protocol ImageFilterDataProvider {
-    var compressedData: UIImage? { get }
+    var decompressedImage: UIImage? { get }
 }
 
-
+extension ImageDecompressionOperation: ImageFilterDataProvider {
+    var decompressedImage: UIImage? { return outputImage }
+}
 //: Showing off with custom operators
 infix operator |> { associativity left precedence 160 }
 func |>(lhs: NSOperation, rhs: NSOperation) -> NSOperation {
@@ -94,22 +105,20 @@ appendQueue.maxConcurrentOperationCount = 1
 
 //: Create a filter operations for each of the iamges, adding a completionBlock
 for compressedFile in compressedFilePaths {
-  guard let inputURL = compressedFile else { continue }
-  
-  
-  // TODO: Update the operation graph to add filtering
-  let loadingOperation = DataLoadOperation(url: inputURL)
-  let decompressionOp = ImageDecompressionOperation()
-  decompressionOp.completionBlock = {
-    guard let output = decompressionOp.outputImage else { return }
-    appendQueue.addOperationWithBlock {
-      filteredImages.append(output)
+    guard let inputURL = compressedFile else { continue }
+    let loadingOperation = DataLoadOperation(url: inputURL)
+    let decompressionOp = ImageDecompressionOperation()
+    let filterOperation = TiltShiftOperation()
+    filterOperation.completionBlock = {
+        guard let output = filterOperation.outputImage else { return }
+        appendQueue.addOperationWithBlock {
+            filteredImages.append(output)
+        }
     }
-  }
-  
-  loadingOperation |> decompressionOp
-  
-  queue.addOperations([loadingOperation, decompressionOp], waitUntilFinished: false)
+    
+    loadingOperation |> decompressionOp |> filterOperation
+    
+    queue.addOperations([loadingOperation, decompressionOp, filterOperation], waitUntilFinished: false)
 }
 
 //: Need to wait for the queue to finish before checking the results
