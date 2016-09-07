@@ -75,7 +75,7 @@ class TiltShiftOperation : NSOperation {
 
 //: Image filter input data transfer
 protocol ImageFilterDataProvider {
-  // TODO: Fill this in
+    var compressedData: UIImage? { get }
 }
 
 
