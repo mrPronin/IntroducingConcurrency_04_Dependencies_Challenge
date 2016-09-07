@@ -64,13 +64,7 @@ class TiltShiftOperation : NSOperation {
   var outputImage: UIImage?
   
   override func main() {
-    
-    if let imageProvider = dependencies
-        .filter({$0 is ImageFilterDataProvider})
-        .first as? ImageFilterDataProvider
-        where inputImage == .None {
-            inputImage = imageProvider.image
-    }
+    // TODO: Update the input image location to check for input from dependencies
     
     guard let inputImage = inputImage else { return }
     let mask = topAndBottomGradient(inputImage.size)
@@ -81,12 +75,9 @@ class TiltShiftOperation : NSOperation {
 
 //: Image filter input data transfer
 protocol ImageFilterDataProvider {
-    var image: UIImage? {get}
+  // TODO: Fill this in
 }
 
-extension ImageDecompressionOperation: ImageFilterDataProvider {
-    var image: UIImage? { return outputImage }
-}
 
 //: Showing off with custom operators
 infix operator |> { associativity left precedence 160 }
@@ -103,23 +94,22 @@ appendQueue.maxConcurrentOperationCount = 1
 
 //: Create a filter operations for each of the iamges, adding a completionBlock
 for compressedFile in compressedFilePaths {
-    guard let inputURL = compressedFile else { continue }
-    
-    
-    // TODO: Update the operation graph to add filtering
-    let loadingOperation = DataLoadOperation(url: inputURL)
-    let decompressionOp = ImageDecompressionOperation()
-    let filterOperation = TiltShiftOperation()
-    filterOperation.completionBlock = {
-        guard let output = filterOperation.outputImage else { return }
-        appendQueue.addOperationWithBlock {
-            filteredImages.append(output)
-        }
+  guard let inputURL = compressedFile else { continue }
+  
+  
+  // TODO: Update the operation graph to add filtering
+  let loadingOperation = DataLoadOperation(url: inputURL)
+  let decompressionOp = ImageDecompressionOperation()
+  decompressionOp.completionBlock = {
+    guard let output = decompressionOp.outputImage else { return }
+    appendQueue.addOperationWithBlock {
+      filteredImages.append(output)
     }
-    
-    loadingOperation |> decompressionOp |> filterOperation
-    
-    queue.addOperations([loadingOperation, decompressionOp, filterOperation], waitUntilFinished: false)
+  }
+  
+  loadingOperation |> decompressionOp
+  
+  queue.addOperations([loadingOperation, decompressionOp], waitUntilFinished: false)
 }
 
 //: Need to wait for the queue to finish before checking the results
